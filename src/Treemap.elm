@@ -48,14 +48,16 @@ cut r area =
     { x = r.x + areaWidth
     , y = r.y
     , width = newWidth
-    , height = r.height }
+    , height = r.height
+    }
   else
     let areaHeight = area / r.width
         newHeight = r.height - areaHeight in
     { x = r.x
     , y = r.y + areaHeight
     , width = r.width
-    , height = newHeight }
+    , height = newHeight
+    }
 
 coordinates : List Float -> Rectangle -> List Coordinate
 coordinates rows r =
@@ -73,7 +75,8 @@ coordinates rows r =
     List.map2 (\row offset -> { x1 = offset
                               , y1 = r.y
                               , x2 = offset + row / height
-                              , y2 = r.y + height}) rows offsets
+                              , y2 = r.y + height
+                              }) rows offsets
 
 squarify' : Data -> List Float -> Rectangle -> List Coordinate
 squarify' values rows container =

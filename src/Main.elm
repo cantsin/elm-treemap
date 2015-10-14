@@ -1,16 +1,15 @@
 module Main where
 
 import Text exposing (..)
+import String exposing (..)
 import Treemap exposing (Data, Coordinate, squarify)
-import Graphics.Element exposing (show)
+import Graphics.Element exposing (..)
 import Graphics.Collage exposing (Form, rect, move, text, defaultLine, filled, collage, group)
 import Color exposing (rgba, white)
 
--- testing purposes only.
-
 type alias SampleData = List (String, Float)
 
-style = { defaultStyle | color <- white }
+maximumFontSize = 20
 
 extract : SampleData -> (List String, Data)
 extract datum =
@@ -24,29 +23,53 @@ normalize area values =
       multiplier = area / total in
     List.map (\v -> v * multiplier) values
 
-draw : Coordinate -> String -> Form
-draw c title =
-  let w = c.x2 - c.x1
-      h = c.y2 - c.y1
+fontSize : Float -> Float -> Float -> Float
+fontSize average width height =
+  let r = width * height |> sqrt in
+  min (r / average) maximumFontSize
+
+draw : Float -> Float -> Float -> Coordinate -> String -> Form
+draw width height average coord title =
+  let w = coord.x2 - coord.x1
+      h = coord.y2 - coord.y1
       -- translate from top-left coordinates to center of element
-      x = c.x1 + (w / 2) - (width / 2)
-      y = (height / 2) - (h / 2) - c.y1
+      x = coord.x1 + (w / 2) - (width / 2)
+      y = (height / 2) - (h / 2) - coord.y1
       -- temporary colors, for now
-      color = rgba 255 (c.y2 |> round) 255 255
-      t = text <| Text.color white (Text.height (h / 4) (Text.fromString title))
+      color = rgba 255 (coord.y2 |> round) 255 255
+      size = fontSize average w h
+      t = Text.fromString title
+        |> Text.height size
+        |> Text.color white
+        |> text
       g = rect w h in
   group [move (x, y) <| filled color g, move(x, y) t]
 
-main =
-  let area = width * height
-      (titles, values) = extract testData
-      data = normalize area values
-      result = squarify data { x = 0, y = 0, width = width, height = height }
-      rectangles = List.map2 draw result titles in
-  collage width height rectangles
+averageLabelSize : List String -> Float
+averageLabelSize labels =
+  let n = List.map String.length labels
+        |> List.sum
+        |> Basics.toFloat
+      d = List.length labels
+        |> Basics.toFloat in
+  n / d
 
-width = 400
-height = 200
+treemap : Int -> Int -> SampleData -> Element
+treemap w h data =
+  let width = Basics.toFloat w
+      height = Basics.toFloat h
+      area = width * height
+      (titles, values) = extract data
+      normalizedData = normalize area values
+      average = averageLabelSize titles
+      result = squarify normalizedData { x = 0, y = 0, width = width, height = height }
+      rectangles = List.map2 (draw width height average) result titles in
+  collage w h rectangles
+
+-- testing purposes only.
+
+main : Element
+main = treemap 400 200 testData
 
 testData : SampleData
 testData = [ ("Area 1", 6)
