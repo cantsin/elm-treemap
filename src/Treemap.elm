@@ -1,4 +1,4 @@
-module Treemap where
+module Treemap (Data, Coordinate, squarify) where
 
 type alias Data = List Float
 
@@ -40,7 +40,7 @@ betterRatio rows next length =
           new = ratio (List.append rows [next]) length in
       current >= new
 
-cut : Rectangle -> Float -> Rectangle
+cut : Rectangle -> Area -> Rectangle
 cut r area =
   if r.width >= r.height then
     let areaWidth = area / r.height
@@ -75,8 +75,8 @@ coordinates rows r =
                               , x2 = offset + row / height
                               , y2 = r.y + height}) rows offsets
 
-squarify : Data -> List Float -> Rectangle -> List Coordinate
-squarify values rows container =
+squarify' : Data -> List Float -> Rectangle -> List Coordinate
+squarify' values rows container =
   case List.head values of
     Just datapoint ->
       let length = min container.height container.width in
@@ -84,11 +84,14 @@ squarify values rows container =
         let remaining = case List.tail values of
                           Just x -> x
                           Nothing -> [] in
-        squarify remaining (List.append rows [datapoint]) container
+        squarify' remaining (List.append rows [datapoint]) container
       else
         let c = cut container <| List.sum rows
             result = coordinates rows container in
-        squarify values [] c
+        squarify' values [] c
           |> (++) result
     Nothing ->
       coordinates rows container
+
+squarify : Data -> Rectangle -> List Coordinate
+squarify values = squarify' values []
