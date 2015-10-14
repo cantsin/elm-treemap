@@ -5,11 +5,29 @@ import String exposing (..)
 import Treemap exposing (Data, Coordinate, squarify)
 import Graphics.Element exposing (..)
 import Graphics.Collage exposing (Form, rect, move, text, defaultLine, filled, collage, group)
-import Color exposing (rgba, white)
+import Color exposing (Color, rgba, white)
 
 type alias SampleData = List (String, Float)
 
-maximumFontSize = 20
+type alias TreeMapStyle =
+  {
+    width : Int
+  , height : Int
+  , textColor : Color
+  , mapColor1 : Color
+  , mapColor2 : Color
+  , maximumFontSize : Int
+  }
+
+defaultStyle =
+  {
+    width = 400
+  , height = 200
+  , textColor = white
+  , mapColor1 = rgba 255 0 255 255
+  , mapColor2 = rgba 255 255 255 255
+  , maximumFontSize = 20
+  }
 
 extract : SampleData -> (List String, Data)
 extract datum =
@@ -23,13 +41,13 @@ normalize area values =
       multiplier = area / total in
     List.map (\v -> v * multiplier) values
 
-fontSize : Float -> Float -> Float -> Float
-fontSize average width height =
+fontSize : Float -> Float -> Float -> Float -> Float
+fontSize average width height maximum =
   let r = width * height |> sqrt in
-  min (r / average) maximumFontSize
+  min (r / average) maximum
 
-draw : Float -> Float -> Float -> Coordinate -> String -> Form
-draw width height average coord title =
+draw : TreeMapStyle -> Float -> Float -> Float -> Coordinate -> String -> Form
+draw style width height average coord title =
   let w = coord.x2 - coord.x1
       h = coord.y2 - coord.y1
       -- translate from top-left coordinates to center of element
@@ -37,7 +55,7 @@ draw width height average coord title =
       y = (height / 2) - (h / 2) - coord.y1
       -- temporary colors, for now
       color = rgba 255 (coord.y2 |> round) 255 255
-      size = fontSize average w h
+      size = fontSize average w h (Basics.toFloat style.maximumFontSize)
       t = Text.fromString title
         |> Text.height size
         |> Text.color white
@@ -54,22 +72,22 @@ averageLabelSize labels =
         |> Basics.toFloat in
   n / d
 
-treemap : Int -> Int -> SampleData -> Element
-treemap w h data =
-  let width = Basics.toFloat w
-      height = Basics.toFloat h
+treemap : SampleData -> TreeMapStyle -> Element
+treemap data style =
+  let width = Basics.toFloat style.width
+      height = Basics.toFloat style.height
       area = width * height
       (titles, values) = extract data
       normalizedData = normalize area values
       average = averageLabelSize titles
       result = squarify normalizedData { x = 0, y = 0, width = width, height = height }
-      rectangles = List.map2 (draw width height average) result titles in
-  collage w h rectangles
+      rectangles = List.map2 (draw style width height average) result titles in
+  collage style.width style.height rectangles
 
 -- testing purposes only.
 
 main : Element
-main = treemap 400 200 testData
+main = treemap testData defaultStyle
 
 testData : SampleData
 testData = [ ("Area 1", 6)
