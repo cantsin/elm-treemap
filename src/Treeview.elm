@@ -20,11 +20,42 @@ type alias Coordinate =
 
 type alias Area = Float
 
-shortestEdge : Rectangle -> Float
-shortestEdge r = min r.height r.width
+ratio : List Float -> Float -> Float
+ratio rows length =
+  case (List.minimum rows, List.maximum rows) of
+    (Just minimum, Just maximum) ->
+      let sum = List.sum rows
+          l2 = length * length
+          s2 = sum * sum in
+      max ((l2 * maximum) / s2) (s2 / (l2 * minimum))
+    _ ->
+      0.0
 
-improvesRatio : List Float -> Float -> Float -> Bool
-improvesRatio rows next length = True
+betterRatio : List Float -> Float -> Float -> Bool
+betterRatio rows next length =
+  case List.length rows of
+    0 -> True
+    _ ->
+      let current = ratio rows length
+          new = ratio (List.append rows [next]) length in
+      current >= new
+
+cut : Rectangle -> Float -> Rectangle
+cut r area =
+  if r.width >= r.height then
+    let areaWidth = area / r.height
+        newWidth = r.width - areaWidth in
+    { x = r.x + areaWidth
+    , y = r.y
+    , width = newWidth
+    , height = r.height }
+  else
+    let areaHeight = area / r.width
+        newHeight = r.height - areaHeight in
+    { x = r.x
+    , y = r.y + areaHeight
+    , width = r.width
+    , height = newHeight }
 
 coordinates : List Float -> Rectangle -> List Coordinate
 coordinates rows r =
@@ -48,14 +79,14 @@ squarify : Data -> List Float -> Rectangle -> List Coordinate
 squarify values rows container =
   case List.head values of
     Just datapoint ->
-      let length = shortestEdge container
-          remaining = case List.tail values of
-                        Just x -> x
-                        Nothing -> [] in
-      if improvesRatio rows datapoint length then
-        squarify remaining (datapoint :: rows) container
+      let length = min container.height container.width in
+      if betterRatio rows datapoint length then
+        let remaining = case List.tail values of
+                          Just x -> x
+                          Nothing -> [] in
+        squarify remaining (List.append rows [datapoint]) container
       else
-        let c = { x = 0, y = 0, height = 0, width = 0 } in
+        let c = cut container <| List.sum rows in
         squarify values [] c |> (++) (coordinates rows container)
     Nothing ->
       coordinates rows container
@@ -73,7 +104,11 @@ normalize area values =
       multiplier = area / total in
     List.map (\v -> v * multiplier) values
 
-main = show <| (extract testData |> normalize (10*20))
+main =
+  let area = (20*10)
+      data = extract testData |> normalize area
+      result = squarify data [] { x = 0, y = 0, width = 20, height = 10 } in
+      show result
 
 testData : SampleData
 testData = [ ("Area 1", 6)
