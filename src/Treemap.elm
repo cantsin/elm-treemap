@@ -1,4 +1,4 @@
-import Graphics.Element exposing (..)
+module Treemap where
 
 type alias Data = List Float
 
@@ -86,36 +86,9 @@ squarify values rows container =
                           Nothing -> [] in
         squarify remaining (List.append rows [datapoint]) container
       else
-        let c = cut container <| List.sum rows in
-        squarify values [] c |> (++) (coordinates rows container)
+        let c = cut container <| List.sum rows
+            result = coordinates rows container in
+        squarify values [] c
+          |> (++) result
     Nothing ->
       coordinates rows container
-
--- testing purposes only.
-
-type alias SampleData = List (String, Float)
-
-extract : SampleData -> Data
-extract datum = List.map snd datum |> List.sort |> List.reverse
-
-normalize : Float -> Data -> Data
-normalize area values =
-  let total = List.sum values
-      multiplier = area / total in
-    List.map (\v -> v * multiplier) values
-
-main =
-  let area = (20*10)
-      data = extract testData |> normalize area
-      result = squarify data [] { x = 0, y = 0, width = 20, height = 10 } in
-      show result
-
-testData : SampleData
-testData = [ ("Area 1", 6)
-           , ("Area 2", 6)
-           , ("Area 3", 4)
-           , ("Area 4", 3)
-           , ("Area 5", 2)
-           , ("Area 6", 2)
-           , ("Area 7", 1)
-           ]
