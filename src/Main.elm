@@ -1,99 +1,77 @@
 module Main where
 
-import Text exposing (..)
-import String exposing (..)
-import Treemap exposing (Data, Coordinate, squarify)
+import Treemap.Render exposing (SampleData, treemap, defaultStyle)
 import Graphics.Element exposing (..)
-import Graphics.Collage exposing (Form, rect, move, text, filled, collage, group)
-import Color exposing (Color, rgba, white, hsla, toHsl)
+import StartApp.Simple exposing (start)
+import Html exposing (..)
+import Html.Attributes exposing (style)
+import Html.Events exposing (onClick)
+import Random exposing (Seed, initialSeed, generate, int)
 
-type alias SampleData = List (String, Float)
-
-type alias TreeMapStyle =
+type alias Model =
   {
-    width : Int
-  , height : Int
-  , textColor : Color
-  , mapColor : Color
-  , maximumFontSize : Int
+    data : SampleData
+  , seed : Seed
   }
 
-defaultStyle =
-  {
-    width = 400
-  , height = 200
-  , textColor = white
-  , mapColor = rgba 255 0 255 255
-  , maximumFontSize = 20
-  }
+type Action = Add
+            | Reset
 
-extract : SampleData -> (List String, Data)
-extract datum =
-  List.sortBy snd datum
-    |> List.reverse
-    |> List.unzip
+newValue : Seed -> (Int, Seed)
+newValue = generate <| int 1 10
 
-normalize : Float -> Data -> Data
-normalize area values =
-  let total = List.sum values
-      multiplier = area / total in
-    List.map (\v -> v * multiplier) values
+generateOne : (Int, Int, Seed) -> (String, Float)
+generateOne (n, v, seed) = ("Area " ++ toString n, Basics.toFloat v)
 
-fontSize : Float -> Float -> Float -> Int -> Float
-fontSize average width height maximum =
-  let r = width * height |> sqrt in
-  min (r / average) (Basics.toFloat maximum)
+generateModel : Seed -> Model
+generateModel seed =
+  let (n, seed0) = generate (int 5 10) seed
+      -- generate a series of seeds that depend on the previous seed.
+      -- gather up the counter and value while we're at it.
+      values = List.scanl (\c (_, _, seed) ->
+                             let (v, nextSeed) = newValue seed in
+                             (c, v, nextSeed)
+                          ) (0, n, seed0) [1..n]
+      -- we don't want the first value, as that is what we used to
+      -- seed the sequence above.
+      data = List.map generateOne <| List.drop 1 values
+      last = case List.head <| List.reverse values of
+               Just (_, _, seed) -> seed
+               Nothing -> seed0 in
+  { data = data, seed = last }
 
-draw : TreeMapStyle -> Float -> Coordinate -> String -> Float -> Form
-draw style average coord title gradient =
-  let width = Basics.toFloat style.width
-      height = Basics.toFloat style.height
-      w = coord.x2 - coord.x1
-      h = coord.y2 - coord.y1
-      -- translate from top-left coordinates to center of element
-      x = coord.x1 + (w / 2) - (width / 2)
-      y = (height / 2) - (h / 2) - coord.y1
-      hsl = Color.toHsl style.mapColor
-      c = { hsl | lightness <- gradient }
-      color = hsla c.hue c.saturation c.lightness c.alpha
-      size = fontSize average w h style.maximumFontSize
-      t = Text.fromString title
-        |> Text.height size
-        |> Text.color style.textColor
-        |> text
-      g = rect w h
-        |> filled color in
-  group <| List.map (move (x, y)) [g, t]
+update : Action -> Model -> Model
+update action model =
+  case action of
+    Add ->
+      let n = List.length model.data + 1
+          (value, nextSeed) = newValue model.seed
+          v = generateOne (n, value, nextSeed) in
+      {
+        data = v :: model.data
+      , seed = nextSeed
+      }
+    Reset ->
+      generateModel model.seed
 
-averageLabelSize : List String -> Float
-averageLabelSize labels =
-  let n = List.map String.length labels
-        |> List.sum
-        |> Basics.toFloat
-      d = List.length labels
-        |> Basics.toFloat in
-  n / d
+view : Signal.Address Action -> Model -> Html
+view address model =
+  div []
+        [ div [] [ treemap model.data defaultStyle |> fromElement ]
+        , div [ debugStyle ] [ text <| toString model.data ]
+        , div [] [ button [ onClick address Add] [ text "Add a new value" ]
+                 , button [ onClick address Reset] [ text "Reset" ] ]
+        ]
 
-treemap : SampleData -> TreeMapStyle -> Element
-treemap data style =
-  let width = Basics.toFloat style.width
-      height = Basics.toFloat style.height
-      area = width * height
-      (titles, values) = extract data
-      normalizedData = normalize area values
-      average = averageLabelSize titles
-      total = List.sum values
-      gradients = List.map (\v -> v / total) values
-      result = squarify normalizedData { x = 0, y = 0, width = width, height = height }
-      rectangles = List.map3 (draw style average) result titles gradients in
-  collage style.width style.height rectangles
+debugStyle : Attribute
+debugStyle =
+  style
+    [ ("font-size", "14px")
+    , ("font-family", "monospace")
+    , ("display", "inline-block")
+    , ("text-align", "center")
+    ]
 
--- testing purposes only.
-
-main : Element
-main = treemap testData defaultStyle
-
-testData : SampleData
 testData = [ ("Area 1", 6)
            , ("Area 2", 6)
            , ("Area 3", 4)
@@ -102,3 +80,12 @@ testData = [ ("Area 1", 6)
            , ("Area 6", 2)
            , ("Area 7", 1)
            ]
+
+main = start
+       {
+         model = { data = testData, seed = initialSeed 0 }
+       , update = update
+       , view = view
+       }
+
+-- TODO add README.md (link to pdf)
