@@ -87,5 +87,3 @@ main = start
        , update = update
        , view = view
        }
-
--- TODO add README.md (link to pdf)
