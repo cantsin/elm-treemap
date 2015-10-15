@@ -4,8 +4,8 @@ import Text exposing (..)
 import String exposing (..)
 import Treemap exposing (Data, Coordinate, squarify)
 import Graphics.Element exposing (..)
-import Graphics.Collage exposing (Form, rect, move, text, defaultLine, filled, collage, group)
-import Color exposing (Color, rgba, white)
+import Graphics.Collage exposing (Form, rect, move, text, filled, collage, group)
+import Color exposing (Color, rgba, white, hsla, toHsl)
 
 type alias SampleData = List (String, Float)
 
@@ -14,8 +14,7 @@ type alias TreeMapStyle =
     width : Int
   , height : Int
   , textColor : Color
-  , mapColor1 : Color
-  , mapColor2 : Color
+  , mapColor : Color
   , maximumFontSize : Int
   }
 
@@ -24,8 +23,7 @@ defaultStyle =
     width = 400
   , height = 200
   , textColor = white
-  , mapColor1 = rgba 255 0 255 255
-  , mapColor2 = rgba 255 255 255 255
+  , mapColor = rgba 255 0 255 255
   , maximumFontSize = 20
   }
 
@@ -41,27 +39,31 @@ normalize area values =
       multiplier = area / total in
     List.map (\v -> v * multiplier) values
 
-fontSize : Float -> Float -> Float -> Float -> Float
+fontSize : Float -> Float -> Float -> Int -> Float
 fontSize average width height maximum =
   let r = width * height |> sqrt in
-  min (r / average) maximum
+  min (r / average) (Basics.toFloat maximum)
 
-draw : TreeMapStyle -> Float -> Float -> Float -> Coordinate -> String -> Form
-draw style width height average coord title =
-  let w = coord.x2 - coord.x1
+draw : TreeMapStyle -> Float -> Coordinate -> String -> Float -> Form
+draw style average coord title gradient =
+  let width = Basics.toFloat style.width
+      height = Basics.toFloat style.height
+      w = coord.x2 - coord.x1
       h = coord.y2 - coord.y1
       -- translate from top-left coordinates to center of element
       x = coord.x1 + (w / 2) - (width / 2)
       y = (height / 2) - (h / 2) - coord.y1
-      -- temporary colors, for now
-      color = rgba 255 (coord.y2 |> round) 255 255
-      size = fontSize average w h (Basics.toFloat style.maximumFontSize)
+      hsl = Color.toHsl style.mapColor
+      c = { hsl | lightness <- gradient }
+      color = hsla c.hue c.saturation c.lightness c.alpha
+      size = fontSize average w h style.maximumFontSize
       t = Text.fromString title
         |> Text.height size
-        |> Text.color white
+        |> Text.color style.textColor
         |> text
-      g = rect w h in
-  group [move (x, y) <| filled color g, move(x, y) t]
+      g = rect w h
+        |> filled color in
+  group <| List.map (move (x, y)) [g, t]
 
 averageLabelSize : List String -> Float
 averageLabelSize labels =
@@ -80,8 +82,10 @@ treemap data style =
       (titles, values) = extract data
       normalizedData = normalize area values
       average = averageLabelSize titles
+      total = List.sum values
+      gradients = List.map (\v -> v / total) values
       result = squarify normalizedData { x = 0, y = 0, width = width, height = height }
-      rectangles = List.map2 (draw style width height average) result titles in
+      rectangles = List.map3 (draw style average) result titles gradients in
   collage style.width style.height rectangles
 
 -- testing purposes only.
